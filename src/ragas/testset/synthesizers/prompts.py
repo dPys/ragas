@@ -12,6 +12,8 @@ class ThemesPersonasInput(BaseModel):
 
 
 class PersonaThemesMapping(BaseModel):
+    mapping: t.Dict[str, t.List[str]]
+
     @model_validator(mode="before")
     def replace_nulls(cls, value: t.Any) -> t.Any:
         if isinstance(value, dict) and "mapping" in value:
