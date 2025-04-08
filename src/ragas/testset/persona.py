@@ -53,8 +53,9 @@ class PersonaList(BaseModel):
     personas: t.List[Persona]
 
     def __getitem__(self, key: str) -> Persona:
+        clean_key = key.strip('"').strip("'")
         for persona in self.personas:
-            if persona.name == key:
+            if persona.name == clean_key:
                 return persona
         raise KeyError(f"No persona found with name '{key}'")
 

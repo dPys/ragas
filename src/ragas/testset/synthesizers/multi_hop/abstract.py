@@ -7,7 +7,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from ragas.prompt import PydanticPrompt
-from ragas.testset.graph import KnowledgeGraph, Node
+from ragas.testset.graph import KnowledgeGraph, Node, Relationship
 from ragas.testset.graph_queries import get_child_nodes
 from ragas.testset.persona import Persona
 from ragas.testset.synthesizers.multi_hop.base import (
@@ -26,6 +26,7 @@ from ragas.testset.synthesizers.prompts import (
 if t.TYPE_CHECKING:
     from langchain_core.callbacks import Callbacks
 
+SIMILARITY_THRESHOLD = 0.8
 logger = logging.getLogger(__name__)
 
 
@@ -42,15 +43,21 @@ class MultiHopAbstractQuerySynthesizer(MultiHopQuerySynthesizer):
     concept_combination_prompt: PydanticPrompt = ConceptCombinationPrompt()
     theme_persona_matching_prompt: PydanticPrompt = ThemesPersonasMatchingPrompt()
 
-    def get_node_clusters(self, knowledge_graph: KnowledgeGraph) -> t.List[t.Set[Node]]:
+    def get_node_clusters(self: MultiHopAbstractQuerySynthesizer, knowledge_graph: KnowledgeGraph) -> t.List[t.Set[Node]]:
+        """ Patched version using 'similarity_score' property from existing relationships. """
+        def relationship_condition(rel: Relationship) -> bool:
+            return (
+                rel.type == "similarity_based" and
+                rel.get_property("similarity_score") is not None and
+                rel.get_property("similarity_score") >= SIMILARITY_THRESHOLD
+            )
 
         node_clusters = knowledge_graph.find_indirect_clusters(
-            relationship_condition=lambda rel: (
-                True if rel.get_property("summary_similarity") else False
-            ),
+            relationship_condition=relationship_condition,
             depth_limit=3,
         )
-        logger.info("found %d clusters", len(node_clusters))
+        logger = getattr(self, 'logger', logger)
+        logger.info(f"[Patched Abstract] Found {len(node_clusters)} clusters using 'similarity_based' relationships >= {SIMILARITY_THRESHOLD}.")
         return node_clusters
 
     async def _generate_scenarios(
@@ -116,7 +123,7 @@ class MultiHopAbstractQuerySynthesizer(MultiHopQuerySynthesizer):
                 nodes,
                 concept_combination.combinations,
                 personas=persona_list,
-                persona_item_mapping=persona_concepts.mapping,
+                persona_item_mapping={k.strip('"').strip("'"): v for k, v in persona_concepts.mapping.items()},
                 property_name="themes",
             )
             base_scenarios = self.sample_diverse_combinations(

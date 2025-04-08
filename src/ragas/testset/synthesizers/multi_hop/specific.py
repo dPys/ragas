@@ -7,7 +7,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from ragas.prompt import PydanticPrompt
-from ragas.testset.graph import KnowledgeGraph
+from ragas.testset.graph import KnowledgeGraph, Relationship
 from ragas.testset.persona import Persona
 from ragas.testset.synthesizers.multi_hop.base import (
     MultiHopQuerySynthesizer,
@@ -22,6 +22,7 @@ from ragas.testset.synthesizers.prompts import (
 if t.TYPE_CHECKING:
     from langchain_core.callbacks import Callbacks
 
+SIMILARITY_THRESHOLD = 0.8
 logger = logging.getLogger(__name__)
 
 
@@ -43,14 +44,20 @@ class MultiHopSpecificQuerySynthesizer(MultiHopQuerySynthesizer):
     theme_persona_matching_prompt: PydanticPrompt = ThemesPersonasMatchingPrompt()
     generate_query_reference_prompt: PydanticPrompt = QueryAnswerGenerationPrompt()
 
-    def get_node_clusters(self, knowledge_graph: KnowledgeGraph) -> t.List[t.Tuple]:
+    def get_node_clusters(self: MultiHopSpecificQuerySynthesizer, knowledge_graph: KnowledgeGraph) -> t.List[t.Tuple]:
+        """ Patched version using 'similarity_based' type from existing relationships. """
+        def relationship_condition(rel: Relationship) -> bool:
+            return (
+                rel.type == "similarity_based" and
+                rel.get_property("similarity_score") is not None and
+                rel.get_property("similarity_score") >= SIMILARITY_THRESHOLD
+            )
 
         node_clusters = knowledge_graph.find_two_nodes_single_rel(
-            relationship_condition=lambda rel: (
-                True if rel.type == self.relation_type else False
-            )
+            relationship_condition=relationship_condition
         )
-        logger.info("found %d clusters", len(node_clusters))
+        logger = getattr(self, 'logger', logger)
+        logger.info(f"[Patched Specific] Found {len(node_clusters)} related pairs using 'similarity_based' relationships >= {SIMILARITY_THRESHOLD}.")
         return node_clusters
 
     async def _generate_scenarios(
@@ -103,7 +110,7 @@ class MultiHopSpecificQuerySynthesizer(MultiHopQuerySynthesizer):
                         [node_a, node_b],
                         overlapped_items,
                         personas=persona_list,
-                        persona_item_mapping=persona_concepts.mapping,
+                        persona_item_mapping={k.strip('"').strip("'"): v for k, v in persona_concepts.mapping.items()},
                         property_name=self.property_name,
                     )
                     base_scenarios = self.sample_diverse_combinations(

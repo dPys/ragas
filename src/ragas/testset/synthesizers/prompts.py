@@ -1,6 +1,6 @@
 import typing as t
 
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
 from ragas.prompt import PydanticPrompt
 from ragas.testset.persona import Persona
@@ -12,7 +12,14 @@ class ThemesPersonasInput(BaseModel):
 
 
 class PersonaThemesMapping(BaseModel):
-    mapping: t.Dict[str, t.List[str]]
+    @model_validator(mode="before")
+    def replace_nulls(cls, value: t.Any) -> t.Any:
+        if isinstance(value, dict) and "mapping" in value:
+            new_mapping = {}
+            for key, val in value["mapping"].items():
+                new_mapping[key] = val if val is not None else []
+            value["mapping"] = new_mapping
+        return value
 
 
 class ThemesPersonasMatchingPrompt(

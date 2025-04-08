@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import typing as t
+import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from uuid import uuid4
@@ -17,6 +18,9 @@ from ragas.dataset_schema import (
 )
 from ragas.exceptions import UploadException
 from ragas.sdk import get_app_url, upload_packet
+
+
+logger = logging.getLogger(__name__)
 
 
 class TestsetSample(BaseSample):
@@ -68,15 +72,33 @@ class Testset(RagasDataset[TestsetSample]):
             samples=[sample.eval_sample for sample in self.samples]
         )
 
-    def to_list(self) -> t.List[t.Dict]:
-        """
-        Converts the Testset to a list of dictionaries.
-        """
+    def to_list(self: Testset) -> t.List[t.Dict]:
+        """ Patched to_list method with logging. """
         list_dict = []
-        for sample in self.samples:
-            sample_dict = sample.eval_sample.model_dump(exclude_none=True)
+        # print(f"DEBUG [to_list]: Converting {len(self.samples)} samples to list...") # LOGGING
+        for i, sample in enumerate(self.samples):
+            try:
+                if hasattr(sample.eval_sample, 'model_dump'):
+                    sample_dict = sample.eval_sample.model_dump(exclude_none=True)
+                elif hasattr(sample.eval_sample, '__dict__'):
+                    sample_dict = {k: v for k, v in sample.eval_sample.__dict__.items() if not k.startswith('_')}
+                else:
+                    logger.warning(f"Sample {i}: eval_sample ({type(sample.eval_sample)}) cannot be easily converted to dict. Skipping.")
+                    continue # Skip this sample
+            except Exception as dump_error:
+                logger.error(f"Error dumping eval_sample {i}: {dump_error}", exc_info=True)
+                continue
+
             sample_dict["synthesizer_name"] = sample.synthesizer_name
+            doc_id = getattr(sample, 'document_id', 'ATTRIBUTE_MISSING')
+            # print(f"DEBUG [to_list]: Sample {i}: Found document_id attribute value = {doc_id} (Type: {type(doc_id)})") # LOGGING
+            if doc_id is not None and doc_id != 'ATTRIBUTE_MISSING':
+                sample_dict["document_id"] = doc_id
+                # print(f"DEBUG [to_list]: Sample {i}: Added document_id '{doc_id}' to dict.") # LOGGING
+            # else:
+                # print(f"DEBUG [to_list]: Sample {i}: document_id was None or missing, not added.") # LOGGING
             list_dict.append(sample_dict)
+        # print(f"DEBUG [to_list]: Finished conversion.") # LOGGING
         return list_dict
 
     @classmethod

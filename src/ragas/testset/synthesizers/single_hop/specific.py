@@ -15,7 +15,6 @@ from ragas.testset.synthesizers.prompts import (
     ThemesPersonasInput,
     ThemesPersonasMatchingPrompt,
 )
-
 from .base import SingleHopQuerySynthesizer
 
 if t.TYPE_CHECKING:
@@ -111,7 +110,7 @@ class SingleHopSpecificQuerySynthesizer(SingleHopQuerySynthesizer):
                 node,
                 themes,
                 personas=persona_list,
-                persona_concepts=persona_concepts.mapping,
+                persona_concepts={k.strip('"').strip("'"): v for k, v in persona_concepts.mapping.items()},
             )
             scenarios.extend(self.sample_combinations(base_scenarios, samples_per_node))
 
