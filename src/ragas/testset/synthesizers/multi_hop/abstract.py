@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 import typing as t
 from dataclasses import dataclass
 
@@ -27,8 +26,6 @@ if t.TYPE_CHECKING:
     from langchain_core.callbacks import Callbacks
 
 SIMILARITY_THRESHOLD = 0.8
-logger = logging.getLogger(__name__)
-
 
 @dataclass
 class MultiHopAbstractQuerySynthesizer(MultiHopQuerySynthesizer):
@@ -56,8 +53,6 @@ class MultiHopAbstractQuerySynthesizer(MultiHopQuerySynthesizer):
             relationship_condition=relationship_condition,
             depth_limit=3,
         )
-        logger = getattr(self, 'logger', logger)
-        logger.info(f"[Patched Abstract] Found {len(node_clusters)} clusters using 'similarity_based' relationships >= {SIMILARITY_THRESHOLD}.")
         return node_clusters
 
     async def _generate_scenarios(

@@ -23,7 +23,6 @@ if t.TYPE_CHECKING:
     from langchain_core.callbacks import Callbacks
 
 SIMILARITY_THRESHOLD = 0.8
-logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -56,8 +55,6 @@ class MultiHopSpecificQuerySynthesizer(MultiHopQuerySynthesizer):
         node_clusters = knowledge_graph.find_two_nodes_single_rel(
             relationship_condition=relationship_condition
         )
-        logger = getattr(self, 'logger', logger)
-        logger.info(f"[Patched Specific] Found {len(node_clusters)} related pairs using 'similarity_based' relationships >= {SIMILARITY_THRESHOLD}.")
         return node_clusters
 
     async def _generate_scenarios(
